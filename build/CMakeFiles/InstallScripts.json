@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/sleek/source/cpp/bible-app/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

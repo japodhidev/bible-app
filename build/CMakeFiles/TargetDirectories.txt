@@ -1,0 +1,3 @@
+/home/sleek/source/cpp/bible-app/build/CMakeFiles/bible-app.dir
+/home/sleek/source/cpp/bible-app/build/CMakeFiles/edit_cache.dir
+/home/sleek/source/cpp/bible-app/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,12 @@
+./build/
+build.sh
+
+# IDEs
+.vscode/
+.idea/
+.cursor/
+.cursorrules
+
+# OS
+.DS_Store
+.env

@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/bible-app.dir/link.d "CMakeFiles/bible-app.dir/src/main.cpp.o" "CMakeFiles/bible-app.dir/src/cli.cpp.o" "CMakeFiles/bible-app.dir/src/validation.cpp.o" "CMakeFiles/bible-app.dir/src/listing.cpp.o" "CMakeFiles/bible-app.dir/src/fs_utils.cpp.o" "CMakeFiles/bible-app.dir/src/print.cpp.o" -o bible-app

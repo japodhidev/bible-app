@@ -111,6 +111,14 @@ static int readVerseInVersion(const std::filesystem::path& versionRoot, const st
     return 3;
 }
 
+/**
+ * Reads the verse text for the given book/chapter/verse
+ * @param root The path to the resources root directory
+ * @param bookName The name of the book
+ * @param chapter The chapter number
+ * @param verse The verse number
+ * @return The exit code
+ */
 int readVerse(const std::filesystem::path& root, const std::string& bookName, int chapter, int verse) {
     if (!isDirectory(root)) {
         printErr("resources path not found or not a directory: " + root.string() + "\n");
@@ -128,6 +136,15 @@ int readVerse(const std::filesystem::path& root, const std::string& bookName, in
     return 4;
 }
 
+/**
+ * Reads the verse text for the given book/chapter/verse in a specific version
+ * @param root The path to the resources root directory
+ * @param versionId The id of the version to read
+ * @param bookName The name of the book to read
+ * @param chapter The chapter number to read
+ * @param verse The verse number to read
+ * @return The exit code
+ */
 int readVerse(const std::filesystem::path& root, const std::string& versionId, const std::string& bookName, int chapter, int verse) {
     if (!isDirectory(root)) {
         printErr("resources path not found or not a directory: " + root.string() + "\n");

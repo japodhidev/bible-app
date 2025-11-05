@@ -16,12 +16,14 @@ cmake --build build -j
 ./build/bible-app --list --path /path/to/resources
 ./build/bible-app -v -p ./resources
 ./build/bible-app --book "1 Chronicles" --chapter 1 --verse 5
+./build/bible-app --version en-kjv --book "1 Chronicles" --chapter 1 --verse 5
 ```
 
 - `-l, --list`: List versions with version and description.
 - `-v, --validate`: Validate the resources directory structure.
 - `-p, --path <dir>`: Override the resources root (default: `resources`).
 - `--book <name> --chapter <n> --verse <n>`: Print requested verse text.
+- `--version <id>`: Select a specific version (default: `en-kjv`).
 - `-h, --help`: Show help.
 
 ## Expected resources structure

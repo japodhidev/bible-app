@@ -22,7 +22,9 @@ int main(int argc, char* argv[]) {
     int exitCode = 0;
 
     if (parse.config.list) {
-        int ec = listResources(parse.config.resourcesRoot);
+        const std::string defaultVersionId = "en-kjv";
+        const std::string selected = parse.config.versionId.empty() ? std::string() : parse.config.versionId;
+        int ec = listResources(parse.config.resourcesRoot, defaultVersionId, selected);
         exitCode = std::max(exitCode, ec);
     }
 
@@ -33,7 +35,9 @@ int main(int argc, char* argv[]) {
     }
 
     if (!parse.config.bookName.empty() && parse.config.chapter > 0 && parse.config.verse > 0) {
-        int ec = readVerse(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verse);
+        int ec = parse.config.versionId.empty()
+            ? readVerse(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verse)
+            : readVerse(parse.config.resourcesRoot, parse.config.versionId, parse.config.bookName, parse.config.chapter, parse.config.verse);
         exitCode = std::max(exitCode, ec);
     }
 

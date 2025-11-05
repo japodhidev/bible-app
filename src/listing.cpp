@@ -11,7 +11,7 @@
  * Prints a line for a version
  * @param translationDir The path to the translation directory
  */
-static void printVersionLine(const std::filesystem::path& translationDir) {
+static void printVersionLine(const std::filesystem::path& translationDir, const std::string& defaultId, const std::string& selectedId) {
     const std::string id = translationDir.filename().string();
     const auto meta = translationDir / (id + ".json");
     std::string version;
@@ -27,10 +27,14 @@ static void printVersionLine(const std::filesystem::path& translationDir) {
         }
     }
 
+    std::string suffix;
+    if (!defaultId.empty() && id == defaultId) suffix += " [default]";
+    if (!selectedId.empty() && id == selectedId) suffix += " [selected]";
+
     if (!version.empty() || !description.empty()) {
-        printOut(id + " | " + version + " | " + description + "\n");
+        printOut(id + " | " + version + " | " + description + suffix + "\n");
     } else {
-        printOut(id + "\n");
+        printOut(id + suffix + "\n");
     }
 }
 
@@ -40,6 +44,10 @@ static void printVersionLine(const std::filesystem::path& translationDir) {
  * @return The exit code
  */
 int listResources(const std::filesystem::path& root) {
+    return listResources(root, "", "");
+}
+
+int listResources(const std::filesystem::path& root, const std::string& defaultVersionId, const std::string& selectedVersionId) {
     if (!isDirectory(root)) {
         printErr("resources path not found or not a directory: " + root.string() + "\n");
         return 3;
@@ -48,7 +56,7 @@ int listResources(const std::filesystem::path& root) {
     auto versions = listDirectory(root);
     for (const auto& entry : versions) {
         if (!entry.is_directory()) continue;
-        printVersionLine(entry.path());
+        printVersionLine(entry.path(), defaultVersionId, selectedVersionId);
     }
     return 0;
 }

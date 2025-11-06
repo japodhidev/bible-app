@@ -1,6 +1,7 @@
 #include "../include/reader.hpp"
 #include "../include/fs_utils.hpp"
 #include "../include/print.hpp"
+#include "../include/format_utils.hpp"
 
 #include <fstream>
 #include <string>
@@ -121,7 +122,13 @@ static int readVerseInVersion(const std::filesystem::path& versionRoot, const st
             if (verseLen > 0 && std::all_of(verseStr, verseStr + verseLen, ::isdigit)) {
                 int verseNum = std::stoi(std::string(verseStr, verseLen));
                 if (verseNum == verse) {
-                    printOut(std::string(v["text"].GetString()) + "\n");
+                    // Format in prose style
+                    int terminalWidth = getTerminalWidth();
+                    int leftMargin = std::max(4, std::min(15, static_cast<int>(terminalWidth * 0.10)));
+                    int firstLineIndent = 4;
+                    std::string formatted = formatVerseProse(std::string(v["text"].GetString()), 
+                                                             verseNum, terminalWidth, leftMargin, firstLineIndent);
+                    printOut(formatted);
                     return 0;
                 }
             }
@@ -215,7 +222,13 @@ static int readVerseRangeInVersion(const std::filesystem::path& versionRoot, con
         return 3;
     }
 
+    // Calculate formatting parameters once
+    int terminalWidth = getTerminalWidth();
+    int leftMargin = std::max(4, std::min(15, static_cast<int>(terminalWidth * 0.10)));
+    int firstLineIndent = 4;
+
     bool allFound = true;
+    bool isFirstVerse = true;
     for (int i = startVerse; i <= endVerse; ++i) {
         auto it = verseToText.find(i);
         if (it == verseToText.end()) {
@@ -223,7 +236,16 @@ static int readVerseRangeInVersion(const std::filesystem::path& versionRoot, con
             printErr("verse not found: " + std::to_string(i) + "\n");
             continue;
         }
-        printOut(std::to_string(i) + " " + it->second + "\n");
+        
+        // Add blank line before verse if not the first one
+        if (!isFirstVerse) {
+            printOut("\n");
+        }
+        isFirstVerse = false;
+        
+        // Format verse in prose style
+        std::string formatted = formatVerseProse(it->second, i, terminalWidth, leftMargin, firstLineIndent);
+        printOut(formatted);
     }
     return allFound ? 0 : 3;
 }

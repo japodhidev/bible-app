@@ -191,8 +191,14 @@ static int readVerseRangeInVersion(const std::filesystem::path& versionRoot, con
     if (bookDir.empty()) return 4;
 
     const auto chapterFile = bookDir / "chapters" / (std::to_string(chapter) + ".json");
-    if (!isRegularFile(chapterFile) || fileSize(chapterFile) == 0) {
-        printErr("chapter not found or empty: " + chapterFile.string() + "\n");
+    // Non-existent chapter file
+    if (!isRegularFile(chapterFile)) {
+        printErr("chapter not found: " + std::to_string(chapter) + "\n");
+        return 3;
+    }
+    // Empty chapter file
+    if (fileSize(chapterFile) == 0) {
+        printErr("chapter is empty: " + chapterFile.string() + "\n");
         return 3;
     }
 

@@ -12,6 +12,7 @@ struct AppConfig {
     std::string bookName {};
     int chapter {0};
     int verse {0};
+    std::string verseRange {};
     // Version selection
     std::string versionId {};
 };

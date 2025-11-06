@@ -16,7 +16,7 @@ std::string buildUsage(const char* argv0) {
         << "      --version <id>     Select version id (default: en-kjv)\n"
         << "      --book <name>      Select book name to read\n"
         << "      --chapter <n>      Select chapter number\n"
-        << "      --verse <n>        Select verse number\n"
+        << "      --verse <n|a-b>    Select a single verse or a verse range (a-b)\n"
         << "  -h, --help             Show this help message\n";
     return oss.str();
 }
@@ -73,7 +73,14 @@ CliParseResult parseCommandLine(int argc, char* argv[]) {
             if (i + 1 >= argc) { result.status = CliParseStatus::Error; result.errorMessage = "Missing value for --verse"; return result; }
             std::string value = argv[++i];
             if (isFlag(value)) { result.status = CliParseStatus::Error; result.errorMessage = "--verse requires a value"; return result; }
-            try { config.verse = std::stoi(value); } catch (...) { result.status = CliParseStatus::Error; result.errorMessage = "--verse must be an integer"; return result; }
+            // Accept either integer or range string a-b
+            auto dashPos = value.find('-');
+            if (dashPos != std::string::npos) {
+                // Leave validation of range format to reader; store raw
+                config.verseRange = value;
+            } else {
+                try { config.verse = std::stoi(value); } catch (...) { result.status = CliParseStatus::Error; result.errorMessage = "--verse must be an integer or a range a-b"; return result; }
+            }
         } else {
             result.status = CliParseStatus::Error;
             result.errorMessage = "Unknown option: " + arg;
@@ -81,7 +88,7 @@ CliParseResult parseCommandLine(int argc, char* argv[]) {
         }
     }
 
-    if (!config.list && !config.validate && (config.bookName.empty() || config.chapter <= 0 || config.verse <= 0)) {
+    if (!config.list && !config.validate && (config.bookName.empty() || config.chapter <= 0 || (config.verse <= 0 && config.verseRange.empty()))) {
         // If no action flags, default to help to be explicit.
         result.status = CliParseStatus::ShowHelp;
         result.config = config;

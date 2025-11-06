@@ -33,11 +33,18 @@ int main(int argc, char* argv[]) {
         int ec = printValidationReport(res);
         exitCode = std::max(exitCode, ec);
     }
-
-    if (!parse.config.bookName.empty() && parse.config.chapter > 0 && parse.config.verse > 0) {
-        int ec = parse.config.versionId.empty()
-            ? readVerse(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verse)
-            : readVerse(parse.config.resourcesRoot, parse.config.versionId, parse.config.bookName, parse.config.chapter, parse.config.verse);
+    // Read verses if the book name and chapter are provided.
+    if (!parse.config.bookName.empty() && parse.config.chapter > 0) {
+        int ec = 0;
+        if (!parse.config.verseRange.empty()) {
+            ec = parse.config.versionId.empty()
+                ? readVerses(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verseRange)
+                : readVerses(parse.config.resourcesRoot, parse.config.versionId, parse.config.bookName, parse.config.chapter, parse.config.verseRange);
+        } else if (parse.config.verse > 0) {
+            ec = parse.config.versionId.empty()
+                ? readVerse(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verse)
+                : readVerse(parse.config.resourcesRoot, parse.config.versionId, parse.config.bookName, parse.config.chapter, parse.config.verse);
+        }
         exitCode = std::max(exitCode, ec);
     }
 

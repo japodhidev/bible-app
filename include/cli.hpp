@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <string>
+#include <regex>
+#include <vector>
 
 struct AppConfig {
     std::filesystem::path resourcesRoot {"resources"};
@@ -11,10 +13,12 @@ struct AppConfig {
     // Reading options
     std::string bookName {};
     int chapter {0};
-    int verse {0};
-    std::string verseRange {};
+    std::string verseSpec {};  // Can be: single number, range "a-b", or comma-separated list "23, 27, 34-40"
+    std::string reading {}; // Supported formats: Joshua 1:9, Joshua 1:9-13, Joshua 1:9-13, 14, 20
     // Version selection
     std::string versionId {};
+    // Config file
+    std::filesystem::path configPath {};
 };
 
 enum class CliParseStatus {
@@ -29,6 +33,16 @@ struct CliParseResult {
     std::string errorMessage {};
 };
 
+struct ReadingSpec {
+    std::string bookName {};
+    int chapter {};
+    std::string verseSpec {};
+    CliParseStatus status {CliParseStatus::Ok};
+    std::string errorMessage {};
+};
+
 CliParseResult parseCommandLine(int argc, char* argv[]);
 
 std::string buildUsage(const char* argv0);
+
+ReadingSpec parseReadingSpec(const std::string& input);

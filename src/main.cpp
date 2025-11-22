@@ -6,6 +6,7 @@
 #include "../include/validation.hpp"
 #include "../include/print.hpp"
 #include "../include/reader.hpp"
+#include "../include/config.hpp"
 
 int main(int argc, char* argv[]) {
     auto parse = parseCommandLine(argc, argv);
@@ -19,32 +20,69 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // Load config file
+    std::filesystem::path configPath = parse.config.configPath;
+    if (configPath.empty()) {
+        configPath = getDefaultConfigPath();
+    }
+    Config config = loadConfig(configPath);
+
+    // Merge config with CLI args (CLI args override config)
+    AppConfig& appConfig = parse.config;
+    
+    // Use config resourcesRoot only if CLI didn't specify one (check if it's the default)
+    bool usingDefaultResources = (appConfig.resourcesRoot == std::filesystem::path("resources"));
+    if (usingDefaultResources && !config.resourcesRoot.empty()) {
+        appConfig.resourcesRoot = config.resourcesRoot;
+    }
+    
+    // Use config default version only if CLI didn't specify one
+    if (appConfig.versionId.empty() && !config.defaultVersion.empty()) {
+        appConfig.versionId = config.defaultVersion;
+    }
+
+    // Validate that resources directory exists
+    if (!std::filesystem::exists(appConfig.resourcesRoot) || !std::filesystem::is_directory(appConfig.resourcesRoot)) {
+        printErr("Error: resources directory not found: " + appConfig.resourcesRoot.string() + "\n");
+        printErr("Please specify --path or set resources_dir in config file.\n");
+        return 3;
+    }
+
     int exitCode = 0;
 
-    if (parse.config.list) {
+    if (appConfig.list) {
         const std::string defaultVersionId = "en-kjv";
-        const std::string selected = parse.config.versionId.empty() ? std::string() : parse.config.versionId;
-        int ec = listResources(parse.config.resourcesRoot, defaultVersionId, selected);
+        const std::string selected = appConfig.versionId.empty() ? std::string() : appConfig.versionId;
+        int ec = listResources(appConfig.resourcesRoot, defaultVersionId, selected);
         exitCode = std::max(exitCode, ec);
     }
 
-    if (parse.config.validate) {
-        auto res = validateResources(parse.config.resourcesRoot);
+    if (appConfig.validate) {
+        auto res = validateResources(appConfig.resourcesRoot);
         int ec = printValidationReport(res);
         exitCode = std::max(exitCode, ec);
     }
-    // Read verses if the book name and chapter are provided.
-    if (!parse.config.bookName.empty() && parse.config.chapter > 0) {
-        int ec = 0;
-        if (!parse.config.verseRange.empty()) {
-            ec = parse.config.versionId.empty()
-                ? readVerses(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verseRange)
-                : readVerses(parse.config.resourcesRoot, parse.config.versionId, parse.config.bookName, parse.config.chapter, parse.config.verseRange);
-        } else if (parse.config.verse > 0) {
-            ec = parse.config.versionId.empty()
-                ? readVerse(parse.config.resourcesRoot, parse.config.bookName, parse.config.chapter, parse.config.verse)
-                : readVerse(parse.config.resourcesRoot, parse.config.versionId, parse.config.bookName, parse.config.chapter, parse.config.verse);
+
+    if (!appConfig.reading.empty()) {
+        // TODO: Parse new book + chapter + verse/s spec
+        auto reading = parseReadingSpec(appConfig.reading);
+        if (reading.status == CliParseStatus::Error) {
+            printErr(reading.errorMessage);
         }
+        appConfig.bookName = reading.bookName;
+        appConfig.chapter = reading.chapter;
+        appConfig.verseSpec = reading.verseSpec;
+
+        int ec = appConfig.versionId.empty()
+            ? readVersesFromSpec(appConfig.resourcesRoot, appConfig.bookName, appConfig.chapter, appConfig.verseSpec)
+            : readVersesFromSpec(appConfig.resourcesRoot, appConfig.versionId, appConfig.bookName, appConfig.chapter, appConfig.verseSpec);
+        exitCode = std::max(exitCode, ec);
+    } else if (!appConfig.bookName.empty() && appConfig.chapter > 0) {
+        // Read verses if the book name and chapter are provided.
+        // Verse is now optional - if omitted, entire chapter is printed.
+        int ec = appConfig.versionId.empty()
+            ? readVersesFromSpec(appConfig.resourcesRoot, appConfig.bookName, appConfig.chapter, appConfig.verseSpec)
+            : readVersesFromSpec(appConfig.resourcesRoot, appConfig.versionId, appConfig.bookName, appConfig.chapter, appConfig.verseSpec);
         exitCode = std::max(exitCode, ec);
     }
 

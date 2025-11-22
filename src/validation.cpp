@@ -84,14 +84,13 @@ ValidationResult validateResources(const std::filesystem::path& root) {
                     addIssue(result, Severity::Error, cEntry.path(), "invalid chapter number");
                 }
             }
-            // Accomodate for non-contiguous chapter numbers but notify the user rather than fail
+            // Check contiguous 1..N
             if (!chapterNumbers.empty()) {
-                // Check contiguous 1..N
                 int expected = 1;
                 for (int n : chapterNumbers) {
                     if (n != expected) {
                         addIssue(result, Severity::Error, chaptersDir, "chapter numbers must be contiguous starting at 1");
-                        continue;
+                        break; // Stop after first mismatch to avoid duplicate error messages
                     }
                     ++expected;
                 }

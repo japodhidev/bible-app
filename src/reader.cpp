@@ -6,6 +6,8 @@
 #include <fstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <set>
 #include <algorithm>
 #include <cctype>
 
@@ -157,7 +159,77 @@ static bool parseVerseRange(const std::string& verseRange, int& startVerse, int&
         return false;
     }
     if (startVerse <= 0 || endVerse <= 0) return false;
-    if (startVerse >= endVerse) return false; // first value should be smaller than the second
+    if (startVerse > endVerse) return false; // allow start == end for single verse ranges
+    return true;
+}
+
+// Parses verse specification: single number, range "a-b", or comma-separated list "23, 27, 34-40"
+// Returns sorted vector of verse numbers to print
+static bool parseVerseSpec(const std::string& verseSpec, std::vector<int>& verses) {
+    if (verseSpec.empty()) {
+        return true; // Empty means all verses (entire chapter)
+    }
+    
+    std::string spec = verseSpec;
+    // Remove spaces around commas
+    size_t pos = 0;
+    while ((pos = spec.find(", ", pos)) != std::string::npos) {
+        spec.replace(pos, 2, ",");
+    }
+    while ((pos = spec.find(" ,")) != std::string::npos) {
+        spec.replace(pos, 2, ",");
+    }
+    
+    // Split by commas
+    std::vector<std::string> parts;
+    std::string current;
+    for (char c : spec) {
+        if (c == ',') {
+            if (!current.empty()) {
+                parts.push_back(current);
+                current.clear();
+            }
+        } else if (!std::isspace(c)) {
+            current += c;
+        }
+    }
+    if (!current.empty()) {
+        parts.push_back(current);
+    }
+    
+    std::set<int> verseSet; // Use set to automatically handle duplicates and sorting
+    
+    for (const auto& part : parts) {
+        if (part.empty()) continue;
+        
+        // Check if it's a range
+        auto dashPos = part.find('-');
+        if (dashPos != std::string::npos) {
+            int startVerse = 0, endVerse = 0;
+            std::string rangeStr = part;
+            if (parseVerseRange(rangeStr, startVerse, endVerse)) {
+                for (int v = startVerse; v <= endVerse; ++v) {
+                    verseSet.insert(v);
+                }
+            } else {
+                return false; // Invalid range format
+            }
+        } else {
+            // Single verse number
+            if (!std::all_of(part.begin(), part.end(), ::isdigit)) {
+                return false; // Invalid verse number
+            }
+            try {
+                int verseNum = std::stoi(part);
+                if (verseNum <= 0) return false;
+                verseSet.insert(verseNum);
+            } catch (...) {
+                return false;
+            }
+        }
+    }
+    
+    verses.assign(verseSet.begin(), verseSet.end());
     return true;
 }
 
@@ -187,6 +259,85 @@ static int parseChapterFile(const std::filesystem::path& chapterFile, std::unord
         }
     }
     return maxVerse;
+}
+
+// Reads and prints a list of verses (may be non-contiguous) from a chapter for a specific version.
+static int readVerseListInVersion(const std::filesystem::path& versionRoot, const std::string& bookName, int chapter, const std::vector<int>& verses, bool printAllVerses) {
+    const auto booksDir = versionRoot / "books";
+    if (!isDirectory(booksDir)) return 3;
+
+    const auto bookDir = findBookDirByName(booksDir, bookName);
+    if (bookDir.empty()) return 4;
+
+    const auto chapterFile = bookDir / "chapters" / (std::to_string(chapter) + ".json");
+    if (!isRegularFile(chapterFile)) {
+        printErr("chapter not found: " + std::to_string(chapter) + "\n");
+        return 3;
+    }
+    if (fileSize(chapterFile) == 0) {
+        printErr("chapter is empty: " + chapterFile.string() + "\n");
+        return 3;
+    }
+
+    // Parse chapter file
+    std::unordered_map<int, std::string> verseToText;
+    const int maxVerse = parseChapterFile(chapterFile, &verseToText);
+    if (maxVerse == 0) {
+        printErr("invalid chapter JSON schema: " + chapterFile.string() + "\n");
+        return 2;
+    }
+
+    // Determine which verses to print
+    std::vector<int> versesToPrint;
+    if (printAllVerses) {
+        // Print all verses from 1 to maxVerse
+        for (int v = 1; v <= maxVerse; ++v) {
+            if (verseToText.find(v) != verseToText.end()) {
+                versesToPrint.push_back(v);
+            }
+        }
+    } else {
+        // Validate that all requested verses exist and are within range
+        for (int v : verses) {
+            if (v > maxVerse) {
+                printErr("verse " + std::to_string(v) + " exceeds available verses (max " + std::to_string(maxVerse) + ")\n");
+                return 3;
+            }
+            if (verseToText.find(v) == verseToText.end()) {
+                printErr("verse not found: " + std::to_string(v) + "\n");
+                return 3;
+            }
+        }
+        versesToPrint = verses;
+    }
+
+    if (versesToPrint.empty()) {
+        printErr("no verses found in chapter " + std::to_string(chapter) + "\n");
+        return 3;
+    }
+
+    // Calculate formatting parameters once
+    int terminalWidth = getTerminalWidth();
+    int leftMargin = std::max(4, std::min(15, static_cast<int>(terminalWidth * 0.10)));
+    int firstLineIndent = 4;
+
+    // Print verses
+    bool isFirstVerse = true;
+    for (int verseNum : versesToPrint) {
+        auto it = verseToText.find(verseNum);
+        if (it == verseToText.end()) continue;
+
+        // Add blank line before verse if not the first one
+        if (!isFirstVerse) {
+            printOut("\n");
+        }
+        isFirstVerse = false;
+
+        // Format verse in prose style
+        std::string formatted = formatVerseProse(it->second, verseNum, terminalWidth, leftMargin, firstLineIndent);
+        printOut(formatted);
+    }
+    return 0;
 }
 
 // Reads and prints a range of verses within a single chapter for a specific version.
@@ -248,6 +399,67 @@ static int readVerseRangeInVersion(const std::filesystem::path& versionRoot, con
         printOut(formatted);
     }
     return allFound ? 0 : 3;
+}
+
+/**
+ * Reads verses based on verseSpec. If verseSpec is empty, prints entire chapter.
+ * verseSpec can be: single number, range "a-b", or comma-separated list "23, 27, 34-40"
+ */
+int readVersesFromSpec(const std::filesystem::path& root, const std::string& bookName, int chapter, const std::string& verseSpec) {
+    if (!isDirectory(root)) {
+        printErr("resources path not found or not a directory: " + root.string() + "\n");
+        return 3;
+    }
+
+    // Parse verse specification
+    std::vector<int> verses;
+    bool printAllVerses = verseSpec.empty();
+    if (!printAllVerses) {
+        if (!parseVerseSpec(verseSpec, verses)) {
+            printErr("invalid verse specification format. Expected: single number, range (a-b), or comma-separated list (e.g., \"23, 27, 34-40\")\n");
+            return 1;
+        }
+    }
+
+    // Iterate through versions until one succeeds
+    for (const auto& version : listDirectory(root)) {
+        if (!version.is_directory()) continue;
+        int rc = readVerseListInVersion(version.path(), bookName, chapter, verses, printAllVerses);
+        if (rc == 0) return 0;
+        if (rc == 2) return rc; // schema error
+        // otherwise try next version
+    }
+    return 4;
+}
+
+/**
+ * Reads verses based on verseSpec for a specific version
+ */
+int readVersesFromSpec(const std::filesystem::path& root, const std::string& versionId, const std::string& bookName, int chapter, const std::string& verseSpec) {
+    if (!isDirectory(root)) {
+        printErr("resources path not found or not a directory: " + root.string() + "\n");
+        return 3;
+    }
+
+    // Parse verse specification
+    std::vector<int> verses;
+    bool printAllVerses = verseSpec.empty();
+    if (!printAllVerses) {
+        if (!parseVerseSpec(verseSpec, verses)) {
+            printErr("invalid verse specification format. Expected: single number, range (a-b), or comma-separated list (e.g., \"23, 27, 34-40\")\n");
+            return 1;
+        }
+    }
+
+    if (!versionId.empty()) {
+        const auto versionRoot = root / versionId;
+        if (!isDirectory(versionRoot)) {
+            printErr("version not found: " + versionId + "\n");
+            return 3;
+        }
+        return readVerseListInVersion(versionRoot, bookName, chapter, verses, printAllVerses);
+    }
+    return readVersesFromSpec(root, bookName, chapter, verseSpec);
 }
 
 /**

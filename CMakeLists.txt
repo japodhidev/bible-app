@@ -14,6 +14,7 @@ add_executable(bible-app
     src/print.cpp
     src/reader.cpp
     src/format_utils.cpp
+    src/config.cpp
 )
  
 # Headers live in include/

@@ -1,6 +1,7 @@
 #include "../include/cli.hpp"
 
 #include <sstream>
+#include <iostream>
 
 static bool isFlag(const std::string& token) {
     return !token.empty() && token[0] == '-';
@@ -13,10 +14,14 @@ std::string buildUsage(const char* argv0) {
         << "  -l, --list             List available versions (with version & description)\n"
         << "  -v, --validate         Validate resources directory structure\n"
         << "  -p, --path <dir>       Set resources root directory (default: resources)\n"
+        << "  -r, --read             Read from a book, chapter & verse combination\n"
         << "      --version <id>     Select version id (default: en-kjv)\n"
         << "      --book <name>      Select book name to read\n"
         << "      --chapter <n>      Select chapter number\n"
-        << "      --verse <n|a-b>    Select a single verse or a verse range (a-b)\n"
+        << "      --verse <spec>     Select verses (optional; if omitted, entire chapter is printed)\n"
+        << "                        Format: single number, range (a-b), or comma-separated list\n"
+        << "                        Examples: 23, \"23, 27\", \"23, 34-40\"\n"
+        << "      --config <path>    Path to config file (default: ~/.config/bible-app/config.ini)\n"
         << "  -h, --help             Show this help message\n";
     return oss.str();
 }
@@ -73,14 +78,19 @@ CliParseResult parseCommandLine(int argc, char* argv[]) {
             if (i + 1 >= argc) { result.status = CliParseStatus::Error; result.errorMessage = "Missing value for --verse"; return result; }
             std::string value = argv[++i];
             if (isFlag(value)) { result.status = CliParseStatus::Error; result.errorMessage = "--verse requires a value"; return result; }
-            // Accept either integer or range string a-b
-            auto dashPos = value.find('-');
-            if (dashPos != std::string::npos) {
-                // Leave validation of range format to reader; store raw
-                config.verseRange = value;
-            } else {
-                try { config.verse = std::stoi(value); } catch (...) { result.status = CliParseStatus::Error; result.errorMessage = "--verse must be an integer or a range a-b"; return result; }
-            }
+            // Store the verse specification as-is (validation happens in reader)
+            config.verseSpec = value;
+        } else if (arg == "--config") {
+            if (i + 1 >= argc) { result.status = CliParseStatus::Error; result.errorMessage = "Missing value for --config"; return result; }
+            std::string value = argv[++i];
+            if (isFlag(value)) { result.status = CliParseStatus::Error; result.errorMessage = "--config requires a value"; return result; }
+            config.configPath = value;
+        } else if (arg == "--read" || arg == "-r") {
+            // TODO: Add an option --read that takes in the book, chapter & verse/s in any of the following formats: Joshua 1:9, Joshua 1:9-13, Joshua 1:9-13, 14
+            if (i + 1 >= argc) { result.status = CliParseStatus::Error; result.errorMessage = "Missing value for --read"; return result; }
+            std::string value = argv[++i];
+            if (isFlag(value)) { result.status = CliParseStatus::Error; result.errorMessage = "--read requires a value"; return result; }
+            config.reading = value;
         } else {
             result.status = CliParseStatus::Error;
             result.errorMessage = "Unknown option: " + arg;
@@ -88,7 +98,8 @@ CliParseResult parseCommandLine(int argc, char* argv[]) {
         }
     }
 
-    if (!config.list && !config.validate && (config.bookName.empty() || config.chapter <= 0 || (config.verse <= 0 && config.verseRange.empty()))) {
+    // Verse is now optional - if book and chapter are provided, that's enough
+    if (!config.list && !config.validate && (config.bookName.empty() || config.chapter <= 0) && config.reading.empty()) {
         // If no action flags, default to help to be explicit.
         result.status = CliParseStatus::ShowHelp;
         result.config = config;
@@ -100,4 +111,28 @@ CliParseResult parseCommandLine(int argc, char* argv[]) {
     return result;
 }
 
+/**
+ * Parse the reading specification
+ * @param  input The reading specification
+ * @return       The parsed result
+ */
+ReadingSpec parseReadingSpec(const std::string& input) {
+    ReadingSpec readingSpec;
+    std::regex pattern(R"(^((?:[^\d]|\d+ ).+) (\d+)(?::\s*(.*))?$)");
+    std::smatch matches;
 
+    if (std::regex_match(input, matches, pattern)) {
+        readingSpec.bookName = matches[1].str();
+        readingSpec.chapter = std::stoi(matches[2].str());
+
+        if (matches[3].matched) {
+            readingSpec.verseSpec = matches[3].str();
+        }
+        readingSpec.status = CliParseStatus::Ok;
+    } else {
+        readingSpec.status = CliParseStatus::Error;
+        readingSpec.errorMessage = "Invalid reading specification";
+    }
+
+    return readingSpec;
+}

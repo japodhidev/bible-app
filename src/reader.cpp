@@ -64,12 +64,181 @@ static bool chapterContainsBookName(const std::filesystem::path& chapterFile, co
 }
 
 /**
+ * Expands short book name abbreviations to full book names
+ * @param shortName The short name or abbreviation
+ * @return The full book name, or the original string if no mapping found
+ */
+static std::string expandBookName(const std::string& shortName) {
+    // Create a static map of short names to full names
+    static const std::unordered_map<std::string, std::string> shortNameMap = {
+        // Old Testament
+        {"Gen", "Genesis"},
+        {"Ex", "Exodus"},
+        {"Exod", "Exodus"},
+        {"Lev", "Leviticus"},
+        {"Num", "Numbers"},
+        {"Deut", "Deuteronomy"},
+        {"Josh", "Joshua"},
+        {"Judg", "Judges"},
+        {"Ruth", "Ruth"},
+        {"1 Sam", "1 Samuel"},
+        {"1Sam", "1 Samuel"},
+        {"1Samuel", "1 Samuel"},
+        {"2 Sam", "2 Samuel"},
+        {"2Sam", "2 Samuel"},
+        {"2Samuel", "2 Samuel"},
+        {"1 Kgs", "1 Kings"},
+        {"1Kgs", "1 Kings"},
+        {"1Kings", "1 Kings"},
+        {"2 Kgs", "2 Kings"},
+        {"2Kgs", "2 Kings"},
+        {"2Kings", "2 Kings"},
+        {"1 Chr", "1 Chronicles"},
+        {"1Chr", "1 Chronicles"},
+        {"1Chronicles", "1 Chronicles"},
+        {"2 Chr", "2 Chronicles"},
+        {"2Chr", "2 Chronicles"},
+        {"2Chronicles", "2 Chronicles"},
+        {"Ezra", "Ezra"},
+        {"Neh", "Nehemiah"},
+        {"Esth", "Esther"},
+        {"Esther", "Esther"},
+        {"Job", "Job"},
+        {"Ps", "Psalms"},
+        {"Pss", "Psalms"},
+        {"Prov", "Proverbs"},
+        {"Eccl", "Ecclesiastes"},
+        {"Song", "Song of Solomon"},
+        {"Song of Sol", "Song of Solomon"},
+        {"Isa", "Isaiah"},
+        {"Jer", "Jeremiah"},
+        {"Lam", "Lamentations"},
+        {"Ezek", "Ezekiel"},
+        {"Dan", "Daniel"},
+        {"Hos", "Hosea"},
+        {"Joel", "Joel"},
+        {"Amos", "Amos"},
+        {"Obad", "Obadiah"},
+        {"Jonah", "Jonah"},
+        {"Mic", "Micah"},
+        {"Nah", "Nahum"},
+        {"Hab", "Habakkuk"},
+        {"Zeph", "Zephaniah"},
+        {"Hag", "Haggai"},
+        {"Zech", "Zechariah"},
+        {"Mal", "Malachi"},
+        // New Testament
+        {"Matt", "Matthew"},
+        {"Mark", "Mark"},
+        {"Luke", "Luke"},
+        {"John", "John"},
+        {"Acts", "Acts"},
+        {"Rom", "Romans"},
+        {"1 Cor", "1 Corinthians"},
+        {"1Cor", "1 Corinthians"},
+        {"1Corinthians", "1 Corinthians"},
+        {"2 Cor", "2 Corinthians"},
+        {"2Cor", "2 Corinthians"},
+        {"2Corinthians", "2 Corinthians"},
+        {"Gal", "Galatians"},
+        {"Eph", "Ephesians"},
+        {"Phil", "Philippians"},
+        {"Col", "Colossians"},
+        {"1 Thess", "1 Thessalonians"},
+        {"1Thess", "1 Thessalonians"},
+        {"1Thessalonians", "1 Thessalonians"},
+        {"2 Thess", "2 Thessalonians"},
+        {"2Thess", "2 Thessalonians"},
+        {"2Thessalonians", "2 Thessalonians"},
+        {"1 Tim", "1 Timothy"},
+        {"1Tim", "1 Timothy"},
+        {"1Timothy", "1 Timothy"},
+        {"2 Tim", "2 Timothy"},
+        {"2Tim", "2 Timothy"},
+        {"2Timothy", "2 Timothy"},
+        {"Titus", "Titus"},
+        {"Phlm", "Philemon"},
+        {"Philem", "Philemon"},
+        {"Heb", "Hebrews"},
+        {"Jas", "James"},
+        {"James", "James"},
+        {"1 Pet", "1 Peter"},
+        {"1Pet", "1 Peter"},
+        {"1Peter", "1 Peter"},
+        {"2 Pet", "2 Peter"},
+        {"2Pet", "2 Peter"},
+        {"2Peter", "2 Peter"},
+        {"1 John", "1 John"},
+        {"1John", "1 John"},
+        {"2 John", "2 John"},
+        {"2John", "2 John"},
+        {"3 John", "3 John"},
+        {"3John", "3 John"},
+        {"Jude", "Jude"},
+        {"Rev", "Revelation"},
+        {"Revelation", "Revelation"}
+    };
+    
+    // Normalize input: trim and handle case-insensitive lookup
+    std::string normalized = shortName;
+    // Trim leading whitespace
+    size_t first = normalized.find_first_not_of(" \t");
+    if (first != std::string::npos) {
+        normalized.erase(0, first);
+    } else {
+        normalized.clear();
+    }
+    // Trim trailing whitespace
+    if (!normalized.empty()) {
+        size_t last = normalized.find_last_not_of(" \t");
+        if (last != std::string::npos) {
+            normalized.erase(last + 1);
+        } else {
+            normalized.clear();
+        }
+    }
+    
+    // Try exact match first (case-sensitive)
+    auto it = shortNameMap.find(normalized);
+    if (it != shortNameMap.end()) {
+        return it->second;
+    }
+    
+    // Try case-insensitive match for short names (keys)
+    std::string lowerNormalized = normalized;
+    std::transform(lowerNormalized.begin(), lowerNormalized.end(), lowerNormalized.begin(), ::tolower);
+    for (const auto& pair : shortNameMap) {
+        std::string lowerKey = pair.first;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == lowerNormalized) {
+            return pair.second;
+        }
+    }
+    
+    // Try case-insensitive match for full names (values)
+    // This handles cases where user types lowercase full name like "genesis" instead of "Genesis"
+    for (const auto& pair : shortNameMap) {
+        std::string lowerValue = pair.second;
+        std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
+        if (lowerValue == lowerNormalized) {
+            return pair.second; // Return the properly capitalized full name
+        }
+    }
+    
+    // No mapping found, return original (case-insensitive comparison in chapterContainsBookName will handle it)
+    return shortName;
+}
+
+/**
  * Finds the book directory by name
  * @param booksDir The path to the books directory
- * @param bookName The name of the book to find
+ * @param bookName The name of the book to find (can be short name or full name)
  * @return The path to the book directory, or empty if not found
  */
 static std::filesystem::path findBookDirByName(const std::filesystem::path& booksDir, const std::string& bookName) {
+    // First try to expand short name to full name
+    std::string expandedName = expandBookName(bookName);
+    
     // Iterate through the books directory and check if the book name matches.
     for (const auto& bEntry : listDirectory(booksDir)) {
         if (!bEntry.is_directory()) continue;
@@ -78,7 +247,8 @@ static std::filesystem::path findBookDirByName(const std::filesystem::path& book
         // Check any chapter file for matching book name
         for (const auto& cEntry : listDirectory(chaptersDir)) {
             if (!cEntry.is_regular_file()) continue;
-            if (chapterContainsBookName(cEntry.path(), bookName)) return bEntry.path();
+            // Try expanded name first (this handles both short names and full names)
+            if (chapterContainsBookName(cEntry.path(), expandedName)) return bEntry.path();
         }
     }
     // Only print error message after all candidate books have been checked and not found.
